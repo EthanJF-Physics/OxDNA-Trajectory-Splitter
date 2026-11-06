@@ -18,7 +18,6 @@ keywords = [
     "scientific-computing"
 ]
 classifiers = [
-    "Development Status :: 1 - Planning",
     "Programming Language :: Python :: 3",
     "Operating System :: OS Independent",
     "Topic :: Scientific/Engineering"
