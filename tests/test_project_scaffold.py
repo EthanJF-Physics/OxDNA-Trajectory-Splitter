@@ -8,7 +8,7 @@ from oxdna_splitter.cli import build_argument_parser
 
 class ProjectScaffoldTests(unittest.TestCase):
     def test_package_version(self):
-        self.assertEqual(oxdna_splitter.__version__, "8.0.0")
+        self.assertEqual(oxdna_splitter.__version__, "8.1.0")
 
     def test_cli_parser_builds(self):
         parser = build_argument_parser()

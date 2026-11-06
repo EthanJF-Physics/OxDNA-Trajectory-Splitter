@@ -240,12 +240,12 @@ def _build_plan(
 
 
 def _open_verified_index(
-    topology: Path, trajectory: Path, index_path: Path, build: bool
+    topology: Path, trajectory: Path, index_path: Path, build: bool, *, progress_callback=None
 ) -> IndexReader:
     if build:
-        build_index(topology, trajectory, index_path)
+        build_index(topology, trajectory, index_path, progress_callback=progress_callback)
     try:
-        return open_index(index_path, topology, trajectory)
+        return open_index(index_path, topology, trajectory, progress_callback=progress_callback)
     except FileNotFoundError as exc:
         raise ExtractionError(
             "INDEX_NOT_FOUND",
@@ -287,7 +287,7 @@ def plan_extraction(
         return _build_plan(reader, topology, trajectory, index, frames_spec, output, overwrite)
 
 
-def _copy_range(source, out, start: int, end: int, digest) -> int:
+def _copy_range(source, out, start: int, end: int, digest, *, progress_callback=None, progress_base: int = 0, progress_total: int | None = None) -> int:
     source.seek(start)
     buffer = bytearray(min(COPY_CHUNK_BYTES, max(end - start, 1)))
     view = memoryview(buffer)
@@ -300,6 +300,8 @@ def _copy_range(source, out, start: int, end: int, digest) -> int:
         _write_all(out, chunk)
         digest.update(chunk)
         remaining -= count
+        if progress_callback is not None:
+            progress_callback(progress_base + (end - start - remaining), progress_total or (end - start))
     return end - start
 
 
@@ -357,6 +359,8 @@ def extract_frames(
     index_path: str | Path | None = None,
     overwrite: bool = False,
     build_index_if_needed: bool = False,
+    progress_callback=None,
+    verification_progress_callback=None,
 ) -> ExtractionResult:
     """Extract frames exactly, verify the result, then publish it atomically."""
     topology, trajectory, index, output = _resolve_inputs(
@@ -366,7 +370,7 @@ def extract_frames(
     _check_output_path(
         output, (("topology", topology), ("trajectory", trajectory), ("index", index)), overwrite
     )
-    reader = _open_verified_index(topology, trajectory, index, build_index_if_needed)
+    reader = _open_verified_index(topology, trajectory, index, build_index_if_needed, progress_callback=verification_progress_callback)
     temp_path: Path | None = None
     try:
         with reader:
@@ -380,12 +384,15 @@ def extract_frames(
             with os.fdopen(fd, "wb") as out, trajectory.open("rb") as source:
                 for position, rng in enumerate(plan.ranges):
                     written += _copy_range(
-                        source, out, reader.offset(rng.start - 1), reader.offset(rng.end), digest
+                        source, out, reader.offset(rng.start - 1), reader.offset(rng.end), digest,
+                        progress_callback=progress_callback, progress_base=written, progress_total=plan.expected_bytes
                     )
                     if plan.separator_after_range == position:
                         _write_all(out, plan.separator)
                         digest.update(plan.separator)
                         written += len(plan.separator)
+                if progress_callback is not None:
+                    progress_callback(written, plan.expected_bytes)
                 out.flush()
                 os.fsync(out.fileno())
             if written != plan.expected_bytes:

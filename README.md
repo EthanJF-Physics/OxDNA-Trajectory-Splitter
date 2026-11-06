@@ -2,7 +2,7 @@
 
 A Python tool for validating oxDNA trajectory files and extracting selected frames into new trajectory files.
 
-**Version:** 8.0.0
+**Version:** 8.1.0
 
 ## Features
 
@@ -11,6 +11,7 @@ A Python tool for validating oxDNA trajectory files and extracting selected fram
 - Build reusable frame indexes for large trajectories.
 - Preserve the original topology and trajectory files.
 - Verify extracted trajectories before completion.
+- Show progress, elapsed time, and estimated time remaining for long-running CLI operations.
 
 Validation checks file structure and compatibility. It does not determine scientific correctness or simulation quality.
 
@@ -82,7 +83,7 @@ Before extraction, validate your topology and trajectory:
 
 Use `--verbose` for additional information.
 
-A successful validation reports `VALIDATION PASSED`.
+A successful validation reports `VALIDATION PASSED`. Long-running interactive operations show a progress bar with elapsed time and, when enough progress is known, an estimated time remaining. Progress output is automatically suppressed when output is redirected, and `--quiet` remains quiet.
 
 ## Extract Frames
 

@@ -84,11 +84,16 @@ def _stat_identity(path: Path) -> tuple[int, int, int, int]:
     return st.st_size, st.st_mtime_ns, getattr(st, "st_dev", 0), getattr(st, "st_ino", 0)
 
 
-def _hash_file(path: Path) -> str:
+def _hash_file(path: Path, *, progress_callback=None) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
+        processed = 0
+        total = path.stat().st_size
         while chunk := handle.read(_HASH_CHUNK):
             digest.update(chunk)
+            processed += len(chunk)
+            if progress_callback is not None:
+                progress_callback(processed, total)
     return digest.hexdigest()
 
 
@@ -111,7 +116,7 @@ def _parse_header(record: str, key: str, count: int, path: Path, line: int, offs
     ]
 
 
-def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO) -> tuple[int, int, str, int, str]:
+def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO, *, progress_callback=None) -> tuple[int, int, str, int, str]:
     """Validate/hash a trajectory once while spooling offsets with bounded RAM."""
     digest = hashlib.sha256()
     offset_digest = hashlib.sha256()
@@ -119,6 +124,7 @@ def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO) 
     line = 0
     frame = 0
     field_count: int | None = None
+    total_size = path.stat().st_size
     with path.open("rb") as handle:
         while True:
             frame_start = offset
@@ -158,6 +164,8 @@ def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO) 
             _write_all(offset_spool, packed)
             offset_digest.update(packed)
             frame += 1
+            if progress_callback is not None:
+                progress_callback(offset, total_size)
     if frame == 0:
         raise ValidationError("EMPTY_TRAJECTORY", "Trajectory contains no frames.", path=path)
     packed_eof = _OFFSET.pack(offset)
@@ -196,6 +204,7 @@ def build_index(
     index_path: str | Path | None = None,
     *,
     rebuild: bool = False,
+    progress_callback=None,
 ) -> IndexSummary:
     """Build or safely reuse a checksummed index bound to both source files."""
     topology = Path(topology_path).resolve()
@@ -205,7 +214,7 @@ def build_index(
         raise IndexBuildError("Index destination must not be either source file.")
     if destination.exists() and not rebuild:
         try:
-            reader = open_index(destination, topology, trajectory)
+            reader = open_index(destination, topology, trajectory, progress_callback=progress_callback)
             try:
                 old = reader.summary
                 return IndexSummary(
@@ -228,7 +237,7 @@ def build_index(
         top_hash = _hash_file(topology)
         with tempfile.TemporaryFile(mode="w+b") as offset_spool:
             frame_count, nucleotide_fields, trajectory_hash, trajectory_size, offsets_hash = _scan_trajectory(
-                trajectory, top_info.nucleotide_count, offset_spool
+                trajectory, top_info.nucleotide_count, offset_spool, progress_callback=progress_callback
             )
             offset_spool.flush()
             offset_spool.seek(0)
@@ -324,7 +333,7 @@ class IndexReader:
         self.close()
 
 
-def _read_index_file(path: Path, topology: Path, trajectory: Path, *, verify_sources: bool) -> IndexReader:
+def _read_index_file(path: Path, topology: Path, trajectory: Path, *, verify_sources: bool, progress_callback=None) -> IndexReader:
     handle = path.open("rb")
     try:
         size = os.fstat(handle.fileno()).st_size
@@ -384,7 +393,7 @@ def _read_index_file(path: Path, topology: Path, trajectory: Path, *, verify_sou
                         raise IndexSourceMismatch(f"Cannot stat {label} source: {exc}") from exc
                     if current_stat[0] != int(recorded["size_bytes"]):
                         raise IndexSourceMismatch(f"{label.capitalize()} size differs from the indexed source.")
-                    if _hash_file(source) != recorded["sha256"]:
+                    if _hash_file(source, progress_callback=progress_callback if label == "trajectory" else None) != recorded["sha256"]:
                         raise IndexSourceMismatch(f"{label.capitalize()} SHA-256 differs from the indexed source.")
             summary = IndexSummary(
                 path.resolve(), topology.resolve(), trajectory.resolve(),
@@ -401,6 +410,6 @@ def _read_index_file(path: Path, topology: Path, trajectory: Path, *, verify_sou
         raise
 
 
-def open_index(index_path: str | Path, topology_path: str | Path, trajectory_path: str | Path) -> IndexReader:
+def open_index(index_path: str | Path, topology_path: str | Path, trajectory_path: str | Path, *, progress_callback=None) -> IndexReader:
     """Open an index only after checking its integrity and both source hashes."""
-    return _read_index_file(Path(index_path), Path(topology_path).resolve(), Path(trajectory_path).resolve(), verify_sources=True)
+    return _read_index_file(Path(index_path), Path(topology_path).resolve(), Path(trajectory_path).resolve(), verify_sources=True, progress_callback=progress_callback)

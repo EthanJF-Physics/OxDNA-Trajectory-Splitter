@@ -426,7 +426,7 @@ def validate_trajectory(
     return frame_count, int(field_count or 0), styles, first_time, last_time
 
 
-def validate_files(topology_path: str | Path, trajectory_path: str | Path) -> ValidationSummary:
+def validate_files(topology_path: str | Path, trajectory_path: str | Path, *, progress_callback=None) -> ValidationSummary:
     """Validate a topology and its corresponding trajectory without writing files."""
     topology = validate_topology(topology_path)
     trajectory = Path(trajectory_path)
@@ -437,7 +437,7 @@ def validate_files(topology_path: str | Path, trajectory_path: str | Path) -> Va
             "TRAJECTORY_READ_ERROR", f"Cannot stat trajectory: {exc}", path=trajectory
         ) from exc
     frames, fields, newlines, first_time, last_time = validate_trajectory(
-        trajectory, topology.nucleotide_count
+        trajectory, topology.nucleotide_count, progress_callback=progress_callback
     )
     return ValidationSummary(
         topology=topology,

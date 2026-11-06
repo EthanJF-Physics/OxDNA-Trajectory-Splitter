@@ -39,7 +39,7 @@ class BenchmarkError(Exception):
 
 
 def generate_synthetic_dataset(
-    directory: str | Path, nucleotides: int, frames: int, *, seed: int = 1
+    directory: str | Path, nucleotides: int, frames: int, *, seed: int = 1, progress_callback=None
 ) -> tuple[Path, Path]:
     """Write a deterministic SYNTHETIC topology/trajectory pair (not scientific data)."""
     if not isinstance(nucleotides, int) or not isinstance(frames, int) or nucleotides < 2 or frames < 1:
@@ -62,6 +62,8 @@ def generate_synthetic_dataset(
             for _ in range(nucleotides):
                 lines.append(" ".join(f"{rng.uniform(-50, 50):.6f}" for _ in range(9)))
             handle.write("\n".join(lines) + "\n")
+            if progress_callback is not None:
+                progress_callback(frame + 1, frames)
     return top, dat
 
 
@@ -104,6 +106,7 @@ def run_benchmark(
     frames_spec: str | None = None,
     repeats: int = 3,
     work_dir: str | Path | None = None,
+    progress_callback=None,
 ) -> dict:
     """Benchmark index build, index reuse and extraction; return a report dict."""
     if data_kind not in DATA_KINDS:
@@ -116,7 +119,7 @@ def run_benchmark(
         raise BenchmarkError(f"Work directory does not exist: {work_dir}")
 
     top_hash = _hash_file(topology)
-    traj_hash = _hash_file(trajectory)
+    traj_hash = (_hash_file(trajectory, progress_callback=lambda current, total: progress_callback("Verifying source", current, total)) if progress_callback else _hash_file(trajectory))
     top_size, traj_size = topology.stat().st_size, trajectory.stat().st_size
 
     build_s: list[float] = []
@@ -129,16 +132,16 @@ def run_benchmark(
         spec = frames_spec
         summary = None
         for run in range(repeats):
-            seconds, summary = _timed(lambda: build_index(topology, trajectory, index, rebuild=True))
+            seconds, summary = _timed(lambda: build_index(topology, trajectory, index, rebuild=True, progress_callback=(lambda current, total: progress_callback(f"Building index {run + 1}/{repeats}", current, total)) if progress_callback else None))
             build_s.append(seconds)
             if spec is None:
                 spec = f"1-{max(1, summary.frame_count // 2)}"
-            seconds, reused = _timed(lambda: build_index(topology, trajectory, index))
+            seconds, reused = _timed(lambda: build_index(topology, trajectory, index, progress_callback=(lambda current, total: progress_callback(f"Verifying source {run + 1}/{repeats}", current, total)) if progress_callback else None))
             if not reused.reused:
                 raise BenchmarkError("The freshly built index was not reused; benchmark aborted.")
             reuse_s.append(seconds)
             output = scratch / f"extract_{run}.dat"
-            seconds, result = _timed(lambda: extract_frames(topology, trajectory, spec, output, index_path=index))
+            seconds, result = _timed(lambda: extract_frames(topology, trajectory, spec, output, index_path=index, verification_progress_callback=(lambda current, total: progress_callback(f"Verifying source {run + 1}/{repeats}", current, total)) if progress_callback else None, progress_callback=(lambda current, total: progress_callback(f"Extracting frames {run + 1}/{repeats}", current, total)) if progress_callback else None))
             extract_s.append(seconds)
             extraction_facts.add((result.frames_extracted, result.sha256, result.bytes_written))
             output.unlink()

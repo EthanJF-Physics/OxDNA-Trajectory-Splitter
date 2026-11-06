@@ -5,6 +5,7 @@ import argparse
 import sys
 
 from .validation import ValidationError, validate_files
+from .progress import ProgressDisplay
 from .indexing import IndexErrorBase, build_index, default_index_path
 from .extraction import ExtractionError, extract_frames, plan_extraction
 from .benchmarking import (
@@ -65,6 +66,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
 
 def _run_benchmark(args, parser) -> int:
+    progress = ProgressDisplay(enabled=True)
     generating = args.generate_synthetic is not None
     if generating and (args.topology or args.trajectory or args.data_kind):
         parser.error("--generate-synthetic cannot be combined with --topology, --trajectory or --data-kind.")
@@ -87,14 +89,19 @@ def _run_benchmark(args, parser) -> int:
         )
         with synth_context as synth_dir:
             if generating:
-                top, dat = generate_synthetic_dataset(synth_dir, *args.generate_synthetic)
+                top, dat = generate_synthetic_dataset(
+                    synth_dir, *args.generate_synthetic,
+                    progress_callback=lambda current, total: progress.update("Generating trajectory", current, total),
+                )
                 kind = "synthetic"
             else:
                 top, dat, kind = args.topology, args.trajectory, args.data_kind
             report = run_benchmark(
                 top, dat, data_kind=kind, frames_spec=args.frames,
                 repeats=args.repeats, work_dir=args.work_dir,
+                progress_callback=lambda stage, current, total: progress.update(stage, current, total),
             )
+            progress.finish()
             print(format_report_text(report))
             if args.report:
                 from pathlib import Path
@@ -103,15 +110,19 @@ def _run_benchmark(args, parser) -> int:
                 print(f"\nReport saved:          {saved}")
         return 0
     except BenchmarkError as exc:
+        progress.finish()
         print(f"BENCHMARK FAILED: {exc}", file=sys.stderr)
         return 6
     except ExtractionError as exc:
+        progress.finish()
         print(f"BENCHMARK FAILED [{exc.code}]: {exc.message}", file=sys.stderr)
         return 5
     except IndexErrorBase as exc:
+        progress.finish()
         print(f"BENCHMARK FAILED [INDEX_PROBLEM]: {exc}", file=sys.stderr)
         return 4
     except OSError as exc:
+        progress.finish()
         print(f"BENCHMARK FAILED [FILE_ACCESS_ERROR]: {exc}", file=sys.stderr)
         return 7
 
@@ -121,6 +132,7 @@ def _format_ranges(ranges) -> str:
 
 
 def _run_extract(args) -> int:
+    progress = ProgressDisplay(enabled=not args.quiet)
     try:
         if args.dry_run:
             plan = plan_extraction(
@@ -132,18 +144,24 @@ def _run_extract(args) -> int:
                 args.topology, args.trajectory, args.frames, args.output,
                 index_path=args.index, overwrite=args.overwrite,
                 build_index_if_needed=args.build_index,
+                verification_progress_callback=lambda current, total: progress.update("Verifying source", current, total),
+                progress_callback=lambda current, total: progress.update("Extracting frames", current, total),
             )
     except ExtractionError as exc:
+        progress.finish()
         print(f"EXTRACTION FAILED [{exc.code}]", file=sys.stderr)
         print(exc.message, file=sys.stderr)
         return 5
     except IndexErrorBase as exc:
+        progress.finish()
         print(f"EXTRACTION FAILED [INDEX_PROBLEM]: {exc}", file=sys.stderr)
         print("Run the 'index' command with --rebuild-index, or pass --build-index.", file=sys.stderr)
         return 4
     except OSError as exc:
+        progress.finish()
         print(f"EXTRACTION FAILED [FILE_ACCESS_ERROR]: {exc}", file=sys.stderr)
         return 7
+    progress.finish()
     if args.dry_run:
         print("DRY RUN OK - no files were written")
         if not args.quiet:
@@ -169,15 +187,22 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_argument_parser()
     args = parser.parse_args(argv)
     if args.command == "validate":
+        progress = ProgressDisplay(enabled=not args.quiet)
         try:
-            summary = validate_files(args.topology, args.trajectory)
+            summary = validate_files(
+                args.topology, args.trajectory,
+                progress_callback=lambda frames, current, total: progress.update("Validating trajectory", current, total),
+            )
         except ValidationError as exc:
+            progress.finish()
             print(f"VALIDATION FAILED [{exc.code}]", file=sys.stderr)
             print(str(exc), file=sys.stderr)
             return 3
         except OSError as exc:
+            progress.finish()
             print(f"VALIDATION FAILED [FILE_ACCESS_ERROR]: {exc}", file=sys.stderr)
             return 7
+        progress.finish()
         print("VALIDATION PASSED")
         if not args.quiet:
             print(f"Topology:              {summary.topology.path}")
@@ -195,16 +220,21 @@ def main(argv: list[str] | None = None) -> int:
                 print("Validation mode:       strict; read-only")
         return 0
     if args.command == "index":
+        progress = ProgressDisplay(enabled=not args.quiet)
         try:
             result = build_index(
-                args.topology, args.trajectory, args.index, rebuild=args.rebuild_index
+                args.topology, args.trajectory, args.index, rebuild=args.rebuild_index,
+                progress_callback=lambda current, total: progress.update("Building / verifying", current, total),
             )
         except IndexErrorBase as exc:
+            progress.finish()
             print(f"INDEX FAILED: {exc}", file=sys.stderr)
             return 4
         except OSError as exc:
+            progress.finish()
             print(f"INDEX FAILED [FILE_ACCESS_ERROR]: {exc}", file=sys.stderr)
             return 7
+        progress.finish()
         print("INDEX READY" if result.reused else "INDEX CREATED")
         if not args.quiet:
             print(f"Index:                 {result.index_path}")
