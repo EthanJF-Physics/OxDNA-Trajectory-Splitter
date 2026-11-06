@@ -1,0 +1,6 @@
+include README.md
+include LICENSE-STATUS.md
+include pyproject.toml
+recursive-include docs *.md
+recursive-include releases *.md
+recursive-include tests *.py *.md
