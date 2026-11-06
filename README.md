@@ -281,32 +281,6 @@ frames, a single line terminator (matching that frame's line-ending style) is
 inserted after it so the next frame header starts on its own line. The command
 reports how many separator bytes were inserted.
 
-## Benchmark
-
-Measure index build, index reuse and extraction. Benchmarks only read your
-files; all indexes and outputs go to a temporary folder that is deleted
-afterwards, and your own index files are never touched. The report lists file
-sizes, SHA-256 hashes, repeated timings, throughput, and peak Python memory.
-
-You must say whether the data is real or synthetic, so a report can never be
-mislabelled:
-
-```powershell
-# Your own data (read-only); label it honestly
-python -m oxdna_splitter benchmark --topology "moon.top" --trajectory "slice.dat" --data-kind research --report "bench_research.json"
-
-# Generated test data (clearly marked SYNTHETIC in the report)
-python -m oxdna_splitter benchmark --generate-synthetic 14894 25 --report "bench_synthetic.json"
-```
-
-Options: `--frames` (default: the first half of the frames), `--repeats`
-(1-50, default 3), `--work-dir` (where temporary files go; use a drive with
-enough free space), `--report` (also save JSON; refuses an existing file unless
-`--overwrite`). Notes on interpreting results: timings are wall-clock and
-include operating-system file caching; memory is Python-allocated memory
-measured by `tracemalloc` (it excludes memory-mapped index pages and the OS
-cache); results describe one computer and one dataset. Extraction speed
-includes strict verification of the output, so it is not raw disk-copy speed.
 
 ## Running the tests
 
