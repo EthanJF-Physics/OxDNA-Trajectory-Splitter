@@ -72,6 +72,151 @@ Python executable directly:
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m oxdna_splitter --help
 ```
+## Getting Started — First-Time Users
+
+New to oxDNA Trajectory Splitter? Follow these steps to install the program and extract frames from your first trajectory.
+
+### 1. Download the project
+
+Download the ZIP archive from the GitHub repository using the green **Code → Download ZIP** button.
+
+Extract the ZIP archive to a convenient location on your computer.
+
+### 2. Install Python
+
+Python 3.10 or newer is required.
+
+Download Python from [python.org](https://www.python.org/downloads/).
+
+On Windows, enable **Add Python to PATH** during installation.
+
+### 3. Install oxDNA Trajectory Splitter
+
+Open PowerShell (Windows) or a terminal (Linux/macOS) inside the extracted project directory.
+
+**Windows PowerShell:**
+
+Create a virtual environment:
+
+```powershell
+py -m venv .venv
+```
+
+Install the program:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install .
+```
+
+**Linux / macOS:**
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install .
+```
+
+No additional third-party runtime dependencies are required.
+
+### 4. Check the installation
+
+**Windows:**
+
+```powershell
+.\.venv\Scripts\oxdna-splitter.exe --help
+```
+
+**Linux / macOS:**
+
+```bash
+.venv/bin/oxdna-splitter --help
+```
+
+The help menu lists the four available commands:
+
+- `validate` — validate topology and trajectory files.
+- `index` — build or verify a binary frame index.
+- `extract` — extract selected frames into a new trajectory.
+- `benchmark` — measure indexing and extraction performance.
+
+### 5. Prepare your oxDNA files
+
+You need two files from your oxDNA simulation:
+
+- A topology file (`.top`), describing the simulated system.
+- A trajectory file (`.dat`), containing the simulation frames.
+
+For example:
+
+```text
+moon.top
+slice.dat
+```
+
+Keep your original simulation files unchanged.
+
+### 6. Validate your files
+
+Before extracting anything, check that your topology and trajectory are structurally compatible.
+
+**Windows PowerShell:**
+
+```powershell
+.\.venv\Scripts\oxdna-splitter.exe validate `
+  --topology "$env:USERPROFILE\Desktop\moon.top" `
+  --trajectory "$env:USERPROFILE\Desktop\slice.dat" `
+  --verbose
+```
+
+Replace the example filenames and paths with the locations of your own files.
+
+A successful validation reports `VALIDATION PASSED`.
+
+### 7. Extract your first frames
+
+For example, to extract frames 1 through 10:
+
+```powershell
+.\.venv\Scripts\oxdna-splitter.exe extract `
+  --topology "$env:USERPROFILE\Desktop\moon.top" `
+  --trajectory "$env:USERPROFILE\Desktop\slice.dat" `
+  --frames "1-10" `
+  --output "$env:USERPROFILE\Desktop\moon_extracted.dat" `
+  --build-index
+```
+
+The program builds or refreshes the required index, extracts the selected frames, verifies the new trajectory, and publishes the output.
+
+Your original trajectory is not modified.
+
+### 8. Extract nonconsecutive frames
+
+You can also combine multiple frame ranges into one new trajectory.
+
+For example:
+
+```powershell
+.\.venv\Scripts\oxdna-splitter.exe extract `
+  --topology "$env:USERPROFILE\Desktop\moon.top" `
+  --trajectory "$env:USERPROFILE\Desktop\slice.dat" `
+  --frames "1-3,10,15-18,25" `
+  --output "$env:USERPROFILE\Desktop\moon_selected.dat"
+```
+
+Frame numbers are one-based and ranges are inclusive. Selected ranges must not overlap.
+
+### 9. Verify your output
+
+After extraction, the program reports:
+
+- Number of frames extracted.
+- Output file location and size.
+- Output SHA-256 hash.
+- Strict structural validation result.
+- Frame count verification result.
+
+An `EXTRACTION COMPLETE` message with all verification checks passed indicates that the new trajectory was successfully created and verified.
+
+**Important:** Keep your original topology and trajectory files as your source data. This software performs structural validation and frame extraction; it does not establish scientific correctness or simulation quality.
 
 ## Validate a dataset
 
