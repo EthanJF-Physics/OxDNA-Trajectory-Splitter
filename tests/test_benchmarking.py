@@ -165,6 +165,18 @@ class ReportFileTests(BenchmarkTestBase):
 
 
 class BenchmarkCliTests(BenchmarkTestBase):
+    def test_generate_synthetic_creates_missing_work_dir(self):
+        work = self.root / "new" / "nested-work"
+        report = self.root / "missing-work-report.json"
+        code, out, err = self.run_cli(
+            "benchmark", "--generate-synthetic", "60", "4", "--repeats", "1",
+            "--work-dir", str(work), "--report", str(report),
+        )
+        self.assertEqual(code, 0, err)
+        self.assertTrue(work.is_dir())
+        self.assertEqual(list(work.iterdir()), [])
+        self.assertTrue(report.is_file())
+
     def test_generate_synthetic_mode(self):
         report = self.root / "r.json"
         code, out, _ = self.run_cli("benchmark", "--generate-synthetic", "60", "4", "--repeats", "1",

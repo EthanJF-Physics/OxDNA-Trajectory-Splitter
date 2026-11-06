@@ -141,7 +141,7 @@ def run_benchmark(
                 raise BenchmarkError("The freshly built index was not reused; benchmark aborted.")
             reuse_s.append(seconds)
             output = scratch / f"extract_{run}.dat"
-            seconds, result = _timed(lambda: extract_frames(topology, trajectory, spec, output, index_path=index, verification_progress_callback=(lambda current, total: progress_callback(f"Verifying source {run + 1}/{repeats}", current, total)) if progress_callback else None, progress_callback=(lambda current, total: progress_callback(f"Extracting frames {run + 1}/{repeats}", current, total)) if progress_callback else None))
+            seconds, result = _timed(lambda: extract_frames(topology, trajectory, spec, output, index_path=index, verification_progress_callback=(lambda current, total: progress_callback(f"Pre-extraction verify {run + 1}/{repeats}", current, total)) if progress_callback else None, progress_callback=(lambda current, total: progress_callback(f"Extracting frames {run + 1}/{repeats}", current, total)) if progress_callback else None))
             extract_s.append(seconds)
             extraction_facts.add((result.frames_extracted, result.sha256, result.bytes_written))
             output.unlink()

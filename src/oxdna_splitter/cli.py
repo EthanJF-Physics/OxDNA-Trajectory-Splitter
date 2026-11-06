@@ -83,6 +83,9 @@ def _run_benchmark(args, parser) -> int:
                 ("topology", Path(args.topology).resolve()), ("trajectory", Path(args.trajectory).resolve()),
             )
             check_report_path(args.report, early, overwrite=args.overwrite)  # fail fast, before any work
+        if args.work_dir:
+            from pathlib import Path
+            Path(args.work_dir).mkdir(parents=True, exist_ok=True)
         synth_context = (
             tempfile.TemporaryDirectory(prefix="oxdna-synth-", dir=args.work_dir)
             if generating else contextlib.nullcontext()

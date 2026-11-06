@@ -63,4 +63,5 @@ class ProgressDisplayTests(unittest.TestCase):
             self.assertTrue(verify_updates)
             self.assertTrue(extract_updates)
             self.assertEqual(extract_updates[-1][0], extract_updates[-1][1])
+            self.assertEqual(sum(1 for current, total in extract_updates if current == total), 1)
             self.assertEqual(result.bytes_written, output.stat().st_size)

@@ -391,8 +391,6 @@ def extract_frames(
                         _write_all(out, plan.separator)
                         digest.update(plan.separator)
                         written += len(plan.separator)
-                if progress_callback is not None:
-                    progress_callback(written, plan.expected_bytes)
                 out.flush()
                 os.fsync(out.fileno())
             if written != plan.expected_bytes:
