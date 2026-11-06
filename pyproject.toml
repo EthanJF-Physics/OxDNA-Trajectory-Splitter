@@ -9,7 +9,7 @@ description = "A Python tool for validating, indexing, and extracting frames fro
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
-    { name = "Author name to be added" }
+    { name = "EthanF" }
 ]
 keywords = [
     "oxDNA",
