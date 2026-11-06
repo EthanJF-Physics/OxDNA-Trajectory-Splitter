@@ -27,7 +27,7 @@ Download the project using **Code → Download ZIP** on GitHub and extract the Z
 
 ### 2. Install Python
 
-Install Python 3.10 or newer from [python.org](https://www.python.org/downloads/).
+Install Python 3.10 or newer.
 
 On Windows, enable **Add Python to PATH** during installation.
 
