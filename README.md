@@ -56,22 +56,6 @@ oxdna-trajectory-splitter/
 - Python 3.10 or newer.
 - No third-party runtime dependencies.
 
-## Install for development
-
-From the repository root:
-
-```bash
-python -m venv .venv
-python -m pip install -e .
-```
-
-On Windows PowerShell, if activation is inconvenient, call the environment's
-Python executable directly:
-
-```powershell
-.\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe -m oxdna_splitter --help
-```
 ## Getting Started — First-Time Users
 
 New to oxDNA Trajectory Splitter? Follow these steps to install the program and extract frames from your first trajectory.
@@ -233,16 +217,6 @@ python -m oxdna_splitter validate --topology path/to/system.top --trajectory pat
 Use `--verbose` for additional metadata or `--quiet` for a one-line success
 message. Validation is read-only.
 
-## Run tests
-
-```bash
-python -m unittest discover -s tests -v
-```
-
-Synthetic unit-test files are created in temporary directories and are not real
-research data. The supplied reference topology and trajectory are kept outside
-the repository and treated as read-only integration inputs.
-
 ## Scientific format and safety policy
 
 The supported initial format and strict validation policy are documented in
@@ -250,26 +224,9 @@ The supported initial format and strict validation policy are documented in
 substitute for preserving original simulation data. Keep original `.top` and
 `.dat` files unchanged and make working copies before any external processing.
 
-## Development roadmap and verification
-
-1. Strict validation — implemented and tested.
-2. Binary frame index bound to both topology and trajectory — implemented and tested.
-3. Exact frame extraction with verified publication — implemented and tested.
-4. Safe CLI workflows and reproducible benchmarking — implemented and tested.
-5. Safety campaign — 112 tests pass in the Linux sandbox; the project owner
-   reports 112 passing tests on Windows 11.
-6. Documentation and release-candidate packaging — completed in this package.
-
 **Platform scope:** Windows 11 verification is recorded in the Phase 5 report.
 Linux sandbox tests are also recorded, but they are not a formal Ubuntu LTS
 release test. Ubuntu LTS support is therefore not claimed.
-
-
-## Project administration
-
-**Author:** Project owner (the project owner confirms they created this
-software). No software license is included or selected; see
-[LICENSE-STATUS.md](LICENSE-STATUS.md) for the project's licensing status.
 
 ## Build a frame index
 
@@ -369,13 +326,3 @@ If a command reports that the index is stale or damaged, rebuild it with
 `python -m oxdna_splitter index ... --rebuild-index`. An index is tied to the
 exact location and contents of the topology and trajectory; if you move or edit
 either file, build a new index.
-
-
-
-## Release candidate
-
-The Phase 6 package contains the installable Python distribution and the
-project source. Review `docs/PHASE6_RELEASE_REPORT.md` for packaging checks,
-known limitations, and the exact verification scope. No software license has
-been selected; do not redistribute or publish the package until the project
-owner and relevant institution approve the copyright holder and terms.
