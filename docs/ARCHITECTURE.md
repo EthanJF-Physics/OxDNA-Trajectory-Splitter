@@ -1,117 +1,69 @@
-# OxDNA Trajectory Splitter v8.0.0 — Architecture
+# Architecture
 
-## Initial release scope
-The initial release provides `validate`, `index`, `extract`, and `benchmark`.
-Phase 1 implements strict, read-only scientific-format validation. Indexing and
-extraction follow only after this foundation is tested.
+OxDNA Trajectory Splitter is a command-line tool for validating, indexing, and extracting frames from oxDNA trajectory files. It is designed to preserve source data exactly while processing large files with bounded memory use.
 
-## Package layers
-- `validation.py`: topology and trajectory structure/numeric validation.
-- `trajectory.py`: bounded-memory binary record access and byte offsets.
-- `indexing.py`: portable binary frame index, source fingerprints and reuse.
-- `extraction.py`: exact byte-range extraction and verified atomic publication.
-- `benchmarking.py`: reproducible performance and resource measurements.
-- `cli.py`: command-line interface only; no scientific parsing logic.
-- `__main__.py`: module entry point.
+## Package structure
 
-Low-level modules do not import the CLI. Circular imports are prohibited.
+- `validation.py` — validates topology and trajectory structure and numeric fields.
+- `trajectory.py` — provides binary record access and byte-offset tracking.
+- `indexing.py` — builds and verifies frame indexes.
+- `extraction.py` — copies selected frame byte ranges into a new trajectory.
+- `benchmarking.py` — measures indexing, reuse, extraction, and Python memory use.
+- `cli.py` — implements the command-line interface.
+- `__main__.py` — module entry point.
 
-## Strict validation policy
-- First topology header value declares a positive nucleotide count.
-- Exactly N topology records follow; each has four fields, with integer strand
-  and neighbor fields.
-- Each trajectory frame has `t`, `b`, and `E` headers in that exact order,
-  followed by exactly N nucleotide records.
-- `t` has one finite numeric value; `b` and `E` have three each.
-- Nucleotide records contain exactly 9 or 15 finite numeric fields, consistently.
-- LF and CRLF are accepted, including mixed line endings. Final newline is
-  optional only when the final record/frame is complete.
-- Blank lines, comments, extra lines, malformed numbers, NaN, infinity, and
-  records longer than 4096 bytes are rejected.
-- Validation is structural; it does not establish scientific correctness,
-  strand connectivity, nucleotide identity correctness, or simulation quality.
+Parsing and file-handling logic live outside the CLI so the core operations can be tested and reused independently.
 
-## Data safety and indexing
-- Topology and trajectory inputs are read-only.
-- Index metadata binds to both source files using size and SHA-256, with file
-  identity/mtime as supplemental metadata.
-- Indexing is a single bounded-memory pass; offsets are unsigned 64-bit
-  little-endian values, with N+1 offsets including EOF.
-- Candidate indexes are written to unique temporary files, flushed, synced,
-  verified, and atomically published. Failed rebuilds preserve old valid indexes.
-- Reusing an index verifies both source checksums.
-- Concurrent source changes must stop publication of inconsistent results.
+## Validation
+
+Validation is strict and structural:
+
+- The topology declares a positive nucleotide count and must contain exactly that many nucleotide records.
+- Each trajectory frame contains `t`, `b`, and `E` headers in that order, followed by exactly the topology's nucleotide count.
+- `t` contains one finite numeric value; `b` and `E` contain three each.
+- Nucleotide records contain consistently either 9 or 15 finite numeric fields.
+- LF and CRLF line endings are accepted, including mixed line endings.
+- A final newline is optional only when the final record is complete.
+- Blank lines, comments, malformed or non-finite numbers, extra records, and records longer than 4096 bytes are rejected.
+
+Validation checks file structure, not scientific correctness or simulation quality.
+
+## Indexing
+
+The index stores the byte offset of every frame plus the end-of-file offset. Offsets are unsigned 64-bit little-endian values.
+
+Indexes are tied to both the topology and trajectory using file metadata and SHA-256 checksums. Reuse verifies the source files before trusting an existing index.
+
+Indexing streams the trajectory rather than loading it into memory. Frame offsets are written to temporary storage and later memory-mapped when the index is read.
+
+New indexes are written to temporary files, verified, and atomically published. A failed rebuild does not replace an existing valid index.
 
 ## Extraction
-- User frame numbers are one-based; ranges are inclusive.
-- Multiple non-overlapping ranges can be emitted in requested order into one file.
-- Extraction copies original bytes exactly and never rewrites frame data.
-- Existing outputs are refused unless overwrite is explicit.
-- Output is built in a unique temporary file, checked for count, size, SHA-256,
-  and strict validity, then atomically committed.
-- Output paths may never resolve to the topology, trajectory, or index, including
-  alternate spellings of the path and hard links to those files.
-- Extraction requires an existing valid index (all checks of index reuse apply);
-  `--build-index` is an explicit opt-in. `--dry-run` never builds an index.
-- A contiguous run of selected frames is copied as one byte range. Only the
-  source's final frame can lack a trailing line terminator; if it is extracted
-  and other frames follow it in the output, one terminator in that frame's own
-  line-ending style is inserted and reported. All frame bytes remain exact.
-- Without `--overwrite`, publication fails rather than replacing a file that
-  appeared during extraction (hard-link publication on POSIX, rename on
-  Windows). With `--overwrite`, publication is an atomic replace.
-- Free disk space is checked before writing. Source file metadata is re-checked
-  before publication.
 
-## CLI exit codes
-- 0 success; 2 command-line usage error; 3 validation failure; 4 index problem;
-  5 extraction failure (bad range, protected or existing output, failed
-  verification, insufficient space); 6 benchmark failure; 7 file-access error.
+Frame numbers are one-based and ranges are inclusive. Multiple non-overlapping ranges can be written to one output in the requested order.
 
-## Operational safety
-- `--dry-run` must be read-only.
-- File-creating operations perform preflight describing source paths,
-  destination, overwrite behavior, temporary files, and disk requirements.
-- Ctrl+C must not publish incomplete files; cleanup removes only process-owned
-  temporary files. No user data is deleted to make room.
-- Errors have stable codes and location details.
+Extraction copies the original frame bytes rather than parsing and rewriting them. Contiguous selected frames are copied as a single byte range.
 
-## Performance, compatibility, and release gate
-- Standard-library runtime dependencies only; Python >=3.10.
-- Windows 11 verification is recorded in the Phase 5 report. Linux sandbox
-  verification is recorded separately; formal Ubuntu LTS support is not claimed.
-- Streaming memory is bounded; single-threaded processing is the initial design.
-- Synthetic stress data is clearly labelled as not scientifically valid and
-  kept separate from research data.
-- The supplied research files are read-only integration inputs.
-- Independent checks verify frame counts, offsets, byte sizes, checksums, and
-  extracted content. No critical data-integrity defects may remain at release.
+If the source's final frame has no trailing line terminator and another selected frame follows it in the output, a single matching line terminator is inserted between the frames.
 
-## Benchmarking
-- Measures index build (forced rebuild), index reuse (full SHA-256 verification
-  of both sources) and extraction (including index verification, copying and
-  output verification), with N repeats and median/min/max timings.
-- Throughput is reported in MiB/s of bytes processed by each operation.
-- Peak memory comes from a separate `tracemalloc` pass (tracemalloc slows
-  execution, so it is never mixed into timings); it counts Python allocations
-  only.
-- Inputs are opened read-only and re-hashed afterwards; a changed input
-  invalidates the benchmark. Indexes and outputs live in a unique temporary
-  directory removed on success, failure or interruption; pre-existing indexes
-  are never used or modified.
-- The data kind (`research` or `synthetic`) is mandatory and printed in the
-  report header and stored in the JSON report. Synthetic data is generated
-  deterministically and is not scientifically valid.
-- JSON reports are written atomically, never replace an input file, and refuse
-  an existing path unless overwrite is explicit.
+Extraction requires a valid index unless index creation is explicitly requested. Existing outputs are not replaced unless overwrite is enabled, and output paths are prevented from resolving to the topology, trajectory, or index files.
 
-## Memory and large files
-- Trajectories are only ever streamed: indexing reads line by line and
-  extraction copies in 1 MiB chunks. The only data proportional to file size is
-  the list of frame offsets (8 bytes per frame), kept in a temporary spill file
-  during indexing and memory-mapped when read.
-- Every index open or reuse verifies the SHA-256 of both source files, so each
-  extraction reads each source file once more in full before copying. This is a
-  deliberate integrity-over-speed choice.
-- The benchmark report path is validated before any benchmarking starts.
+Output is written to a temporary file, checked, and atomically published. Failed or interrupted extraction must not publish an incomplete output.
 
+## File safety
+
+Source topology and trajectory files are opened read-only. File-creating operations use process-owned temporary files and do not delete user data to make room.
+
+Before publication, the program checks relevant source metadata and verifies generated data. `--dry-run` performs checks and reports the extraction plan without creating files or indexes.
+
+## Large-file behavior
+
+Trajectory processing is streaming and single-threaded. Indexing reads records incrementally, and extraction copies data in fixed-size chunks.
+
+Memory use does not scale with trajectory size except for the frame-offset index, which uses 8 bytes per stored offset and is memory-mapped when read.
+
+For integrity, opening or reusing an index verifies SHA-256 checksums of both source files. This intentionally favors source verification over maximum extraction speed.
+
+## Compatibility
+
+The runtime uses only the Python standard library and requires Python 3.10 or newer. The project has been tested on Windows and Linux environments.
