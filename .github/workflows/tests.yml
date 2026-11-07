@@ -1,0 +1,145 @@
+name: tests
+
+# Compatibility matrix: every requested Python on Ubuntu and Windows.
+# Small deterministic fixtures only. No GB-scale benchmarks belong in this workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Python ${{ matrix.python }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14", "3.15"]
+    defaults:
+      run:
+        shell: bash   # Git Bash on Windows, so every step script is identical on both OSes
+    env:
+      REQ_PYTHON: ${{ matrix.python }}
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Category 1: interpreter availability. A failure here is NOT a project result.
+      - name: Set up Python ${{ matrix.python }}
+        id: py
+        continue-on-error: true
+        uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python }}
+
+      # setup-python can fail while an unrelated Python is still first on PATH, so
+      # confirm that the interpreter really is the requested major.minor before use.
+      - name: Confirm interpreter version
+        id: interp
+        if: steps.py.outcome == 'success'
+        continue-on-error: true
+        run: |
+          python -VV
+          python - <<'EOF'
+          import os, sys
+          want = tuple(int(p) for p in os.environ["REQ_PYTHON"].split("."))
+          got = sys.version_info[:2]
+          if got != want:
+              sys.exit(f"requested Python {want[0]}.{want[1]} but found {got[0]}.{got[1]}")
+          EOF
+          echo "full=$(python -c 'import platform; print(platform.python_version())')" >> "$GITHUB_OUTPUT"
+
+      # Category 2: installation / packaging, via the documented method.
+      - name: Install from packaging configuration
+        id: install
+        if: steps.interp.outcome == 'success'
+        run: python -m pip install .
+
+      # Category 3: test failure. Later steps still run so each category is reported separately.
+      - name: Full test suite
+        id: tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -W default -m unittest discover -s development/tests -v 2>&1 | tee "$RUNNER_TEMP/tests.log"
+
+      # Category 4: CLI failure (installed entry point, validate -> index -> extract).
+      - name: CLI entry point and validate/index/extract
+        id: cli
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          oxdna-splitter --help > /dev/null
+          d="$RUNNER_TEMP/cli smoke dir"            # path with spaces, on purpose
+          rm -rf "$d"; mkdir -p "$d"
+          trap 'cd "$RUNNER_TEMP"; rm -rf "$d"' EXIT   # leave the dir first: Windows cannot delete the cwd
+          python -c "import sys; from oxdna_splitter.benchmarking import generate_synthetic_dataset as g; g(sys.argv[1], 200, 40)" "$d"
+          cd "$d"
+          mv synthetic.top "my system.top"; mv synthetic.dat "my trajectory.dat"
+          oxdna-splitter validate -t "my system.top" -d "my trajectory.dat" --quiet
+          oxdna-splitter index    -t "my system.top" -d "my trajectory.dat" --quiet
+          oxdna-splitter extract  -t "my system.top" -d "my trajectory.dat" -f 1-40 -o all.dat --quiet
+          cmp "my trajectory.dat" all.dat            # extracting every frame must reproduce the source exactly
+          if oxdna-splitter extract -t "my system.top" -d "my trajectory.dat" -f 1-40 -o all.dat --quiet 2> /dev/null; then
+            echo "overwrite protection failed: existing output was replaced without --overwrite"; exit 1
+          fi
+
+      # Category 5: benchmark failure (small synthetic run; must clean up after itself).
+      - name: Small synthetic benchmark
+        id: bench
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          w="$RUNNER_TEMP/bench work"
+          rm -rf "$w"; mkdir -p "$w"
+          trap 'rm -rf "$w"' EXIT
+          oxdna-splitter benchmark --generate-synthetic 200 40 --repeats 2 --work-dir "$w"
+          if [ -n "$(ls -A "$w")" ]; then echo "benchmark left files behind:"; ls -la "$w"; exit 1; fi
+
+      # Per-job report. Reads outcomes only; an unavailable interpreter is reported as NOT TESTED.
+      - name: Report
+        if: always()
+        env:
+          S_PY: ${{ steps.py.outcome }}
+          S_INTERP: ${{ steps.interp.outcome }}
+          S_INSTALL: ${{ steps.install.outcome }}
+          S_TESTS: ${{ steps.tests.outcome }}
+          S_CLI: ${{ steps.cli.outcome }}
+          S_BENCH: ${{ steps.bench.outcome }}
+          FULL_VERSION: ${{ steps.interp.outputs.full }}
+        run: |
+          title="${RUNNER_OS} / Python ${REQ_PYTHON}"
+          if [ "$S_PY" != success ] || [ "$S_INTERP" != success ]; then
+            reason="setup-python could not provide Python ${REQ_PYTHON} on this runner"
+            [ "$S_PY" = success ] && reason="the interpreter on PATH is not Python ${REQ_PYTHON}"
+            echo "::warning title=NOT TESTED (${title})::${reason}. This is not an OxDNA Trajectory Splitter compatibility result."
+            {
+              echo "### ${title}: NOT TESTED"
+              echo "Interpreter unavailable: ${reason}. This says nothing about the project."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          label() { case "$1" in success) echo PASS;; failure) echo FAIL;; skipped) echo "not run";; *) echo "$1";; esac; }
+          ran="n/a"; warns="n/a"
+          if [ -f "$RUNNER_TEMP/tests.log" ]; then
+            ran="$(grep -E '^Ran [0-9]+ tests? ' "$RUNNER_TEMP/tests.log" | head -1 | sed 's/ in .*//' || true)"
+            warns="$(grep -c 'Warning' "$RUNNER_TEMP/tests.log" || true)"
+          fi
+          failed=""
+          [ "$S_INSTALL" = success ] || failed="$failed install/packaging"
+          [ "$S_TESTS"   = success ] || failed="$failed tests"
+          [ "$S_CLI"     = success ] || failed="$failed CLI"
+          [ "$S_BENCH"   = success ] || failed="$failed benchmark"
+          verdict="PASS"; [ -z "$failed" ] || verdict="FAIL:${failed}"
+          {
+            echo "### ${title} (Python ${FULL_VERSION}): ${verdict}"
+            echo ""
+            echo "| Install | Tests | CLI | Benchmark | Warnings in test log |"
+            echo "|---|---|---|---|---|"
+            echo "| $(label "$S_INSTALL") | $(label "$S_TESTS") (${ran:-no count}) | $(label "$S_CLI") | $(label "$S_BENCH") | ${warns} |"
+          } >> "$GITHUB_STEP_SUMMARY"

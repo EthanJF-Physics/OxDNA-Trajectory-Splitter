@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "oxdna-trajectory-splitter"
+version = "8.2.0"
+description = "A Python tool for validating, indexing, and extracting frames from large oxDNA trajectory files."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "EthanF" }
+]
+keywords = [
+    "oxDNA",
+    "molecular-dynamics",
+    "trajectory",
+    "scientific-computing"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering"
+]
+dependencies = []
+
+[project.scripts]
+oxdna-splitter = "oxdna_splitter.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
