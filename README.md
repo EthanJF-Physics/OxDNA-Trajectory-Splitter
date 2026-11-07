@@ -132,3 +132,17 @@ Indexes allow frames in large trajectories to be located efficiently.
 By default, an index named `trajectory.dat.oxidx` is created beside the trajectory.
 
 If the topology or trajectory is moved or changed, build a new index.
+
+## Viewing Extracted Trajectories
+
+The extracted trajectory can be opened and visualized using **oxView**:
+
+https://sulcgroup.github.io/oxdna-viewer/
+
+For information about oxView and the oxDNA ecosystem, see:
+
+- Poppleton et al., *Design, optimization and analysis of large DNA and RNA nanostructures through interactive visualization, editing and molecular simulation*, Nucleic Acids Research (2020):  
+  https://doi.org/10.1038/s41596-022-00688-5
+
+- Šulc et al., *oxDNA: coarse-grained simulations of nucleic acids made simple*, Nature Protocols (2022):  
+  https://doi.org/10.1093/nar/gkaa417
