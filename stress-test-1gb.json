@@ -1,0 +1,84 @@
+{
+  "created_utc": "2026-11-06T21:11:11+00:00",
+  "data_kind": "synthetic",
+  "data_notice": "SYNTHETIC test data: randomly generated, scientifically meaningless; timings describe software behavior only.",
+  "environment": {
+    "cpu_count": 16,
+    "implementation": "CPython",
+    "machine": "AMD64",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.15.2"
+  },
+  "extraction": {
+    "frames_selected": 3,
+    "frames_spec": "1,600,1200",
+    "output_bytes": 2781187,
+    "output_sha256": "3d57d8aa840521fda21d503fc71960b73c6349b7e73496fb20010cb7e0ec0323"
+  },
+  "index": {
+    "size_bytes": 10492
+  },
+  "notes": [
+    "Timings are wall-clock and include operating-system file caching; the first repeat may be slower than later ones.",
+    "index_build processes the trajectory once; index_reuse verifies the SHA-256 of topology and trajectory; extraction includes index verification, copying and output verification.",
+    "Indexes and outputs were written to a temporary directory and removed afterwards."
+  ],
+  "peak_python_memory_bytes": {
+    "extraction": 2372653,
+    "index_build": 1335720,
+    "index_reuse": 2371550,
+    "method": "tracemalloc; Python-allocated memory only; excludes memory-mapped index pages and the OS file cache"
+  },
+  "repeats": 1,
+  "results": {
+    "extraction": {
+      "bytes_processed": 2781187,
+      "max_seconds": 1.153771,
+      "median_seconds": 1.153771,
+      "median_throughput_mib_per_s": 2.3,
+      "min_seconds": 1.153771,
+      "seconds": [
+        1.153771
+      ]
+    },
+    "index_build": {
+      "bytes_processed": 1112444749,
+      "max_seconds": 57.145001,
+      "median_seconds": 57.145001,
+      "median_throughput_mib_per_s": 18.57,
+      "min_seconds": 57.145001,
+      "seconds": [
+        57.145001
+      ]
+    },
+    "index_reuse": {
+      "bytes_processed": 1112595428,
+      "max_seconds": 0.994092,
+      "median_seconds": 0.994092,
+      "median_throughput_mib_per_s": 1067.36,
+      "min_seconds": 0.994092,
+      "seconds": [
+        0.994092
+      ]
+    }
+  },
+  "schema": 1,
+  "sources": {
+    "fields_per_nucleotide": 9,
+    "frames": 1200,
+    "nucleotides": 10000,
+    "topology": {
+      "name": "synthetic.top",
+      "sha256": "7e38cec5639c9ed78c009f5ce9a50511a893daf30b8363ac685452890517f66d",
+      "size_bytes": 150679
+    },
+    "trajectory": {
+      "name": "synthetic.dat",
+      "sha256": "33d83bf00b9e96b1dc25f30d8411e5296d2438ddb9b755326e5690bf4840204e",
+      "size_bytes": 1112444749
+    }
+  },
+  "sources_unchanged_after_benchmark": true,
+  "tool": "oxdna-trajectory-splitter",
+  "version": "8.1.0"
+}
