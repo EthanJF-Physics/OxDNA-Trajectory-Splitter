@@ -16,6 +16,7 @@ import tempfile
 from typing import BinaryIO
 
 from .validation import (
+    FAST_RECORD_MATCHERS,
     ValidationError,
     _decode_record,
     _parse_finite_number,
@@ -124,6 +125,7 @@ def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO, 
     line = 0
     frame = 0
     field_count: int | None = None
+    fast_match = None  # fast-path matcher; set once the first record fixes the field count
     total_size = path.stat().st_size
     with path.open("rb") as handle:
         while True:
@@ -151,12 +153,19 @@ def _scan_trajectory(path: Path, nucleotide_count: int, offset_spool: BinaryIO, 
                 raw = _read_bounded_line(handle, path, line, offset)
                 if raw is None:
                     raise ValidationError("TRUNCATED_FRAME", "Frame has too few nucleotide records.", path=path, line_number=line, byte_offset=offset, frame_number=frame + 1, expected=str(nucleotide_count))
+                if fast_match is not None and fast_match(raw) is not None:
+                    # Certainly valid and consistent with field_count (see validation.py);
+                    # anything not provably valid takes the strict path below instead.
+                    digest.update(raw)
+                    offset += len(raw)
+                    continue
                 text, _ = _decode_record(raw, path, line, offset)
                 digest.update(raw)
                 fields = _tokens(text, path, line, offset)
                 if len(fields) not in (9, 15) or (field_count is not None and len(fields) != field_count):
                     raise ValidationError("INVALID_NUCLEOTIDE_RECORD", "Nucleotide record must contain consistently 9 or 15 numeric fields.", path=path, line_number=line, byte_offset=offset, frame_number=frame + 1, expected="9 or 15 consistent fields", actual=f"{len(fields)} fields")
                 field_count = len(fields)
+                fast_match = FAST_RECORD_MATCHERS.get(field_count)
                 for token in fields:
                     _parse_finite_number(token, path=path, line_number=line, offset=offset, frame=frame + 1)
                 offset += len(raw)

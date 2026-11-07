@@ -15,6 +15,47 @@ _NUMERIC = re.compile(
     r"^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$"
 )
 
+# ---------------------------------------------------------------------------
+# Fast path for trajectory nucleotide records (used only by indexing).
+#
+# The fast path may only ever answer "this record is certainly valid under the
+# strict rules above". It never rejects anything: a record it does not accept
+# goes through the unchanged strict path, which decides and produces the exact
+# error. To make "certainly valid" provable, the fast number grammar is a bounded
+# subset of _NUMERIC:
+#   - the same syntax as _NUMERIC (ASCII digits only; bytes patterns never match
+#     non-ASCII), but with at most _FAST_MAX_INT_DIGITS integer digits,
+#     _FAST_MAX_FRAC_DIGITS fraction digits and _FAST_MAX_EXP_DIGITS exponent digits;
+#   - fields separated by spaces/tabs only, no leading/trailing blanks, and an
+#     optional single LF or CRLF ending (no other carriage returns).
+# Finiteness: the mantissa is < 10**_FAST_MAX_INT_DIGITS and the decimal exponent is
+# at most 10**_FAST_MAX_EXP_DIGITS - 1, so |value| < 10**(30 + 99) = 10**129, far below
+# the float64 maximum (~1.8e308). Negative exponents can only underflow to zero or a
+# subnormal, which are finite. float() does not raise on text matching the grammar.
+# tests/test_fastpath_rules.py ties these constants to that inequality.
+_FAST_MAX_INT_DIGITS = 30
+_FAST_MAX_FRAC_DIGITS = 30
+_FAST_MAX_EXP_DIGITS = 2
+_FAST_NUMBER = (
+    rb"[+-]?(?:\d{1,%d}(?:\.\d{0,%d})?|\.\d{1,%d})(?:[eE][+-]?\d{1,%d})?"
+    % (_FAST_MAX_INT_DIGITS, _FAST_MAX_FRAC_DIGITS, _FAST_MAX_FRAC_DIGITS, _FAST_MAX_EXP_DIGITS)
+)
+
+
+def _compile_fast_record(field_count: int):
+    pattern = _FAST_NUMBER + rb"(?:[ \t]+" + _FAST_NUMBER + rb"){%d}" % (field_count - 1) + rb"(?:\r?\n)?"
+    return re.compile(pattern).fullmatch
+
+
+# field count -> bound fullmatch(raw_record_bytes); returns a match object or None
+FAST_RECORD_MATCHERS = {count: _compile_fast_record(count) for count in (9, 15)}
+
+
+def fast_record_accepts(raw: bytes, field_count: int | None) -> bool:
+    """True only if `raw` is certainly a valid `field_count`-field nucleotide record."""
+    matcher = FAST_RECORD_MATCHERS.get(field_count)
+    return matcher is not None and matcher(raw) is not None
+
 
 @dataclass(frozen=True)
 class TopologyInfo:

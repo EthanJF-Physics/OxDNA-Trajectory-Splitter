@@ -2,7 +2,7 @@
 
 A Python tool for validating oxDNA trajectory files and extracting selected frames into new trajectory files.
 
-**Version:** 8.1.0
+**Version:** 8.2.0
 
 ## Features
 
