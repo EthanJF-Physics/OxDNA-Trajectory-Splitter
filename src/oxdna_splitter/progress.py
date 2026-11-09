@@ -1,6 +1,5 @@
-"""Small dependency-free terminal progress/timing display for long CLI operations."""
+"""TTY-only progress rendering for long-running command-line operations."""
 from __future__ import annotations
-
 import sys
 import time
 from typing import TextIO
@@ -25,6 +24,7 @@ class ProgressDisplay:
         return f"{hours:d}:{minutes:02d}:{secs:02d}" if hours else f"{minutes:02d}:{secs:02d}"
 
     def update(self, stage: str, current: int, total: int) -> None:
+        """Render a rate-limited progress update for one named stage."""
         if not self.enabled:
             return
         now = time.monotonic()
@@ -56,6 +56,7 @@ class ProgressDisplay:
             self._stage = None
 
     def finish(self) -> None:
+        """Terminate any active progress line without changing operation state."""
         if self.enabled and self._stage is not None:
             self.stream.write("\n")
             self.stream.flush()

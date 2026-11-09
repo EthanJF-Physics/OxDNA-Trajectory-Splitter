@@ -1,10 +1,8 @@
 """Small shared binary-reading helpers for trajectory records."""
 from __future__ import annotations
-
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
-
 from .validation import _decode_record, _read_bounded_line
 
 

@@ -1,20 +1,24 @@
-"""Exact, safe extraction of selected trajectory frames.
+"""Extract selected frames exactly into a new file, verifying before publication.
 
-Selected frames are copied byte-for-byte from the original trajectory using the
-binary frame index. Source files are only ever opened read-only. Output is
-written to a unique temporary file in the destination directory, verified
-(size, SHA-256, strict structural validation, frame count) and only then
-published atomically.
-
-One edge case needs explicit handling: only the *last* frame of a source
-trajectory may lack a final line terminator. If that frame is extracted and
-other frames follow it in the output, a single line terminator (matching the
-frame's own line-ending style) is inserted after it so the next frame header
-does not run into the last record. Every frame's own bytes remain exact; the
-inserted separator is reported in the result.
+User's frame request
+        ↓
+Understand requested ranges
+        ↓
+Check output is safe
+        ↓
+Open + verify index
+        ↓
+Plan exactly what will be copied
+        ↓
+Copy source bytes → temporary file
+        ↓
+Verify temporary file
+        ↓
+Check sources didn't change
+        ↓
+Publish temporary file as final output
 """
 from __future__ import annotations
-
 from dataclasses import dataclass
 import hashlib
 import os
@@ -22,7 +26,6 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-
 from .indexing import (
     IndexReader,
     _fsync_directory,
@@ -242,6 +245,7 @@ def _build_plan(
 def _open_verified_index(
     topology: Path, trajectory: Path, index_path: Path, build: bool, *, progress_callback=None
 ) -> IndexReader:
+    """Optionally build, then open an index only after source-integrity checks."""
     if build:
         build_index(topology, trajectory, index_path, progress_callback=progress_callback)
     try:
@@ -288,6 +292,7 @@ def plan_extraction(
 
 
 def _copy_range(source, out, start: int, end: int, digest, *, progress_callback=None, progress_base: int = 0, progress_total: int | None = None) -> int:
+    """Copy exactly ``[start, end)`` bytes, failing if the indexed source is truncated."""
     source.seek(start)
     buffer = bytearray(min(COPY_CHUNK_BYTES, max(end - start, 1)))
     view = memoryview(buffer)
@@ -339,7 +344,13 @@ def _verify_output(
 
 
 def _publish_no_clobber(temp_path: Path, destination: Path) -> None:
-    """Move temp_path to destination, failing if destination now exists."""
+    """Publish a verified temporary output without replacing an existing destination.
+
+    Raises ``FileExistsError`` when the platform primitive reports an existing
+    destination. Windows uses rename semantics; POSIX prefers hard-link
+    publication. Filesystems without hard-link support use a documented
+    check-then-replace fallback with a small residual race window.
+    """
     if os.name == "nt":
         os.rename(temp_path, destination)  # raises FileExistsError on Windows
         return

@@ -15,6 +15,7 @@ from .benchmarking import (
 
 
 def build_argument_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for validate, index, extract, and benchmark."""
     parser = argparse.ArgumentParser(
         prog="oxdna-splitter",
         description="Strictly validate, index, and extract oxDNA trajectory frames.",
@@ -67,6 +68,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
 
 
 def _run_benchmark(args, parser) -> int:
+    """Execute a benchmark request and emit its human-readable/JSON reports."""
     progress = ProgressDisplay(enabled=True)
     generating = args.generate_synthetic is not None
     if generating and (args.topology or args.trajectory or args.data_kind):
@@ -136,6 +138,7 @@ def _format_ranges(ranges) -> str:
 
 
 def _run_extract(args) -> int:
+    """Execute extraction or dry-run planning and print the resulting summary."""
     progress = ProgressDisplay(enabled=not args.quiet)
     try:
         if args.dry_run:
@@ -190,6 +193,7 @@ def _run_extract(args) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the CLI and return a process-style exit code."""
     parser = build_argument_parser()
     args = parser.parse_args(argv)
     if args.command == "validate":

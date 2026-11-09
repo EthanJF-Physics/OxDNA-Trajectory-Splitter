@@ -4,7 +4,6 @@ The index is a cache, never an authority: every reuse verifies both source
 SHA-256 digests and the index's own metadata/offset checksums.
 """
 from __future__ import annotations
-
 from dataclasses import dataclass
 import hashlib
 import json
@@ -14,7 +13,6 @@ from pathlib import Path
 import struct
 import tempfile
 from typing import BinaryIO
-
 from .validation import (
     FAST_RECORD_MATCHERS,
     ValidationError,
@@ -197,6 +195,7 @@ def _write_all(handle: BinaryIO, data: bytes) -> None:
 
 
 def _fsync_directory(path: Path) -> None:
+    """Best-effort directory sync after publication; unsupported platforms are tolerated."""
     # Directory fsync is available on many POSIX filesystems, but not Windows.
     if os.name == "nt":
         return
@@ -343,6 +342,7 @@ class IndexReader:
 
 
 def _read_index_file(path: Path, topology: Path, trajectory: Path, *, verify_sources: bool, progress_callback=None) -> IndexReader:
+    """Validate index structure/checksums and optionally verify both indexed sources."""
     handle = path.open("rb")
     try:
         size = os.fstat(handle.fileno()).st_size
