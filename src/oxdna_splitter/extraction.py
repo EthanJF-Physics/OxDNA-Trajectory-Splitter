@@ -1,17 +1,21 @@
-"""Exact, safe extraction of selected trajectory frames.
-
-Selected frames are copied byte-for-byte from the original trajectory using the
-binary frame index. Source files are only ever opened read-only. Output is
-written to a unique temporary file in the destination directory, verified
-(size, SHA-256, strict structural validation, frame count) and only then
-published atomically.
-
-One edge case needs explicit handling: only the *last* frame of a source
-trajectory may lack a final line terminator. If that frame is extracted and
-other frames follow it in the output, a single line terminator (matching the
-frame's own line-ending style) is inserted after it so the next frame header
-does not run into the last record. Every frame's own bytes remain exact; the
-inserted separator is reported in the result.
+"""
+User's frame request
+        ↓
+Understand requested ranges
+        ↓
+Check output is safe
+        ↓
+Open + verify index
+        ↓
+Plan exactly what will be copied
+        ↓
+Copy source bytes → temporary file
+        ↓
+Verify temporary file
+        ↓
+Check sources didn't change
+        ↓
+Publish temporary file as final output
 """
 from __future__ import annotations
 
