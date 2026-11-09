@@ -1,6 +1,4 @@
-"""Small dependency-free terminal progress/timing display for long CLI operations."""
 from __future__ import annotations
-
 import sys
 import time
 from typing import TextIO
