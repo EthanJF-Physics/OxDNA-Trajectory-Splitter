@@ -73,7 +73,7 @@ The available commands are:
 
 ## Validate
 
-Before extraction, validate your topology and trajectory.
+Before extraction, validate your topology and trajectory. (You do not have to, you can just do extraction)
 
 **Windows:**
 
