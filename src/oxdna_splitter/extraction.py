@@ -54,14 +54,20 @@ class ExtractionError(Exception):
 
 
 class FrameRangeError(ExtractionError):
+    """The requested frame range is malformed, overlapping, or out of bounds."""
+
     pass
 
 
 class OutputPathError(ExtractionError):
+    """The requested output path is unsafe or cannot be used."""
+
     pass
 
 
 class ExtractionVerificationError(ExtractionError):
+    """The temporary extracted trajectory failed a safety or integrity check."""
+
     pass
 
 
@@ -78,6 +84,8 @@ class FrameRange:
 
 @dataclass(frozen=True)
 class ExtractionPlan:
+    """Describe the verified source byte ranges that an extraction will copy."""
+
     topology_path: Path
     trajectory_path: Path
     index_path: Path
@@ -96,6 +104,8 @@ class ExtractionPlan:
 
 @dataclass(frozen=True)
 class ExtractionResult:
+    """Summarize a completed extraction and its verified output."""
+
     output_path: Path
     topology_path: Path
     trajectory_path: Path
@@ -281,7 +291,7 @@ def plan_extraction(
     topology, trajectory, index, output = _resolve_inputs(
         topology_path, trajectory_path, index_path, output_path
     )
-    # Cheap checks first, so a bad request does not trigger an index build.
+    # Reject simple request/output problems before doing the expensive index work.
     parse_frame_ranges(frames_spec)
     _check_output_path(
         output, (("topology", topology), ("trajectory", trajectory), ("index", index)), overwrite
@@ -359,7 +369,7 @@ def _publish_no_clobber(temp_path: Path, destination: Path) -> None:
     except FileExistsError:
         raise
     except OSError:
-        # Filesystem without hard links: small residual check-then-replace window.
+        # Fallback for filesystems without hard links. A small check-then-replace race remains.
         if destination.exists():
             raise FileExistsError(str(destination))
         os.replace(temp_path, destination)
@@ -446,7 +456,7 @@ def extract_frames(
     except OSError as exc:
         raise ExtractionError("EXTRACTION_IO_ERROR", f"Extraction I/O failed: {exc}") from exc
     finally:
-        # Only the unique temporary file created above is ever removed.
+        # Clean up only this operation's unique temporary file; never remove the requested output.
         if temp_path is not None:
             try:
                 temp_path.unlink(missing_ok=True)

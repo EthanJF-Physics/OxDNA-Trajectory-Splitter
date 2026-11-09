@@ -1,9 +1,19 @@
-"""Reproducible performance measurements for indexing and extraction.
+"""Measure indexing and extraction performance without changing source files.
 
-Benchmarks never modify the input files and never touch an existing index: all
-indexes and extracted outputs live in a unique temporary directory that is
-removed afterwards. Every report states whether the data is SYNTHETIC test data
-or REAL RESEARCH data; the caller must say which, it is never guessed.
+Choose real or synthetic data
+        ↓
+Verify the source files
+        ↓
+Build and reuse temporary indexes
+        ↓
+Extract selected frames to temporary outputs
+        ↓
+Record timing and optional memory measurements
+        ↓
+Verify the source files are unchanged and clean up
+
+Benchmark reports label data as synthetic or research data explicitly; the
+program never guesses which kind of data it was given.
 """
 from __future__ import annotations
 

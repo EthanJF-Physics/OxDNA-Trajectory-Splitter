@@ -1,4 +1,15 @@
-"""Command-line interface for OxDNA Trajectory Splitter."""
+"""Turn command-line requests into validation, indexing, extraction, or benchmarks.
+
+Command-line arguments
+        ↓
+Parse and validate the requested command
+        ↓
+Call the matching library operation
+        ↓
+Show progress and results
+        ↓
+Return a clear success or error exit code
+"""
 from __future__ import annotations
 
 import argparse

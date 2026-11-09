@@ -1,7 +1,17 @@
-"""Strict, read-only validation for the supported oxDNA topology/trajectory layout.
+"""Validate supported oxDNA topology and trajectory files without changing them.
 
-This module deliberately validates structure and finite numeric values. It does not
-attempt to judge whether a simulation is scientifically correct.
+Topology / trajectory input
+        ↓
+Read bounded records
+        ↓
+Check required structure and field counts
+        ↓
+Check numeric values are finite
+        ↓
+Return validated file and frame information
+
+Validation checks file structure and compatibility. It does not decide whether
+the simulation itself is scientifically correct.
 """
 from __future__ import annotations
 
@@ -15,24 +25,15 @@ _NUMERIC = re.compile(
     r"^[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?$"
 )
 
-# ---------------------------------------------------------------------------
-# Fast path for trajectory nucleotide records (used only by indexing).
+# Fast path used while indexing nucleotide records.
 #
-# The fast path may only ever answer "this record is certainly valid under the
-# strict rules above". It never rejects anything: a record it does not accept
-# goes through the unchanged strict path, which decides and produces the exact
-# error. To make "certainly valid" provable, the fast number grammar is a bounded
-# subset of _NUMERIC:
-#   - the same syntax as _NUMERIC (ASCII digits only; bytes patterns never match
-#     non-ASCII), but with at most _FAST_MAX_INT_DIGITS integer digits,
-#     _FAST_MAX_FRAC_DIGITS fraction digits and _FAST_MAX_EXP_DIGITS exponent digits;
-#   - fields separated by spaces/tabs only, no leading/trailing blanks, and an
-#     optional single LF or CRLF ending (no other carriage returns).
-# Finiteness: the mantissa is < 10**_FAST_MAX_INT_DIGITS and the decimal exponent is
-# at most 10**_FAST_MAX_EXP_DIGITS - 1, so |value| < 10**(30 + 99) = 10**129, far below
-# the float64 maximum (~1.8e308). Negative exponents can only underflow to zero or a
-# subnormal, which are finite. float() does not raise on text matching the grammar.
-# development/tests/test_fastpath_rules.py ties these constants to that inequality.
+# It is allowed to ACCEPT a record only when the simpler byte pattern proves the
+# record also satisfies the strict validator. It never rejects a record. Anything
+# uncertain falls back to the normal strict checks below.
+#
+# The digit limits keep every accepted number finite as a Python float: the
+# largest accepted magnitude is below 1e129, well below the float limit (~1.8e308).
+# test_fastpath_rules.py checks that these limits stay safe if they are changed.
 _FAST_MAX_INT_DIGITS = 30
 _FAST_MAX_FRAC_DIGITS = 30
 _FAST_MAX_EXP_DIGITS = 2
@@ -47,7 +48,7 @@ def _compile_fast_record(field_count: int):
     return re.compile(pattern).fullmatch
 
 
-# field count -> bound fullmatch(raw_record_bytes); returns a match object or None
+# Matchers for the two supported nucleotide field counts (9 and 15).
 FAST_RECORD_MATCHERS = {count: _compile_fast_record(count) for count in (9, 15)}
 
 
@@ -59,6 +60,8 @@ def fast_record_accepts(raw: bytes, field_count: int | None) -> bool:
 
 @dataclass(frozen=True)
 class TopologyInfo:
+    """Validated structural information read from a topology file."""
+
     path: Path
     nucleotide_count: int
     strand_count: int | None
@@ -68,6 +71,8 @@ class TopologyInfo:
 
 @dataclass(frozen=True)
 class ValidationSummary:
+    """Validated topology/trajectory information returned to callers."""
+
     topology: TopologyInfo
     trajectory_path: Path
     trajectory_size_bytes: int

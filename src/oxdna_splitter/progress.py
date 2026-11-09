@@ -1,4 +1,16 @@
-"""TTY-only progress rendering for long-running command-line operations."""
+"""Show progress for long-running commands when the terminal can display it.
+
+Operation reports completed work
+        ↓
+Limit refresh rate to keep output readable
+        ↓
+Calculate percent complete, elapsed time, and ETA
+        ↓
+Update one terminal progress line
+
+Progress output is automatically disabled when stderr is not an interactive
+terminal, so redirected output and automated tests stay clean.
+"""
 from __future__ import annotations
 import sys
 import time

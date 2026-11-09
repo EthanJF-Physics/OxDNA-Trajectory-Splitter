@@ -1,4 +1,15 @@
-"""Small shared binary-reading helpers for trajectory records."""
+"""Read trajectory records while preserving their exact bytes and file offsets.
+
+Trajectory file
+        ↓
+Read one bounded binary record
+        ↓
+Decode it for validation
+        ↓
+Keep its original bytes and start/end offsets
+        ↓
+Yield the record to the caller
+"""
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +19,8 @@ from .validation import _decode_record, _read_bounded_line
 
 @dataclass(frozen=True)
 class BinaryRecord:
+    """One trajectory record with decoded text, original bytes, and exact offsets."""
+
     line_number: int
     start_offset: int
     end_offset: int

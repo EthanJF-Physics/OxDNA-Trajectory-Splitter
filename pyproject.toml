@@ -27,11 +27,11 @@ classifiers = [
     "Programming Language :: Python :: 3.15",
     "Topic :: Scientific/Engineering"
 ]
+dependencies = []
 
 [project.urls]
 Repository = "https://github.com/EthanJF-Physics/OxDNA-Trajectory-Splitter"
 Issues = "https://github.com/EthanJF-Physics/OxDNA-Trajectory-Splitter/issues"
-dependencies = []
 
 [project.scripts]
 oxdna-splitter = "oxdna_splitter.cli:main"

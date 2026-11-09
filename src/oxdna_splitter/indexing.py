@@ -1,7 +1,19 @@
-"""Portable, checksummed binary frame indexes for oxDNA trajectories.
+"""Build and verify reusable frame indexes for oxDNA trajectories.
 
-The index is a cache, never an authority: every reuse verifies both source
-SHA-256 digests and the index's own metadata/offset checksums.
+Topology + trajectory
+        ↓
+Validate the topology
+        ↓
+Scan trajectory frames and record byte offsets
+        ↓
+Write a checksummed temporary index
+        ↓
+Verify the completed index
+        ↓
+Publish it for later extraction
+
+An index is only a cache. Reusing one verifies the source-file hashes and the
+index checksums before its offsets are trusted.
 """
 from __future__ import annotations
 from dataclasses import dataclass
@@ -25,8 +37,8 @@ from .validation import (
 
 MAGIC = b"OXIDX8\0\0"
 FORMAT_VERSION = 1
-# magic, version, flags, metadata length, frame count, offset count,
-# metadata SHA-256, offset-array SHA-256
+# Binary header layout: format identity/counts followed by checksums for the
+# metadata and frame-offset table.
 _HEADER = struct.Struct("<8sHHIQQ32s32s")
 _OFFSET = struct.Struct("<Q")
 _HASH_CHUNK = 1024 * 1024
@@ -38,19 +50,27 @@ class IndexErrorBase(Exception):
 
 
 class IndexBuildError(IndexErrorBase):
+    """An index could not be built and verified safely."""
+
     pass
 
 
 class IndexFormatError(IndexErrorBase):
+    """An index file is damaged or has an unsupported format."""
+
     pass
 
 
 class IndexSourceMismatch(IndexErrorBase):
+    """An index does not match the topology or trajectory it was opened with."""
+
     pass
 
 
 @dataclass(frozen=True)
 class SourceIdentity:
+    """Record the file metadata and SHA-256 used to identify one source file."""
+
     path: str
     size_bytes: int
     mtime_ns: int
@@ -61,6 +81,8 @@ class SourceIdentity:
 
 @dataclass(frozen=True)
 class IndexSummary:
+    """Summarize a successfully built or reused trajectory index."""
+
     index_path: Path
     topology_path: Path
     trajectory_path: Path
