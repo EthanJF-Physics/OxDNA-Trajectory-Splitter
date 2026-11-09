@@ -18,7 +18,6 @@ Check sources didn't change
 Publish temporary file as final output
 """
 from __future__ import annotations
-
 from dataclasses import dataclass
 import hashlib
 import os
@@ -26,7 +25,6 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
-
 from .indexing import (
     IndexReader,
     _fsync_directory,
